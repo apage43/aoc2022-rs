@@ -19,11 +19,16 @@ fn main() -> Result<()> {
     }
 
     eprintln!("Inventories: {:#?}", inventories);
-    let sums: Vec<u32> = inventories.iter().map(|x| x.iter().sum()).collect();
+    let mut sums: Vec<u32> = inventories.iter().map(|x| x.iter().sum()).collect();
+    sums.sort();
     eprintln!("Sums: {:#?}", sums);
-    let maxsum = sums.iter().max();
+    let maxsum = sums.last();
     if let Some(maxsum) = maxsum {
-        println!("{}", maxsum);
+        println!("max sum: {}", maxsum);
     }
+    let top3sums = &sums[sums.len() - 3..];
+    let top3total: u32 = top3sums.iter().sum();
+    println!("top3 total: {}", top3total);
+
     Ok(())
 }
