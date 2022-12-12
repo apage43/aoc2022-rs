@@ -1,0 +1,2 @@
+#!/bin/bash
+cargo watch -x "run --bin ${1} < ./inputs/${1}/${2}.txt"

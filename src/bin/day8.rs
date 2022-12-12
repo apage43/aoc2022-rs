@@ -1,7 +1,4 @@
-use color_eyre::{
-    eyre::{bail, ContextCompat},
-    Result,
-};
+use color_eyre::{eyre::ContextCompat, Result};
 
 struct TreeGrid {
     heights: Vec<u8>,
@@ -41,7 +38,6 @@ impl TreeGrid {
         paths.push((x..self.width()).map(|x| (x, y)).skip(1).collect());
         // down
         paths.push((y..self.height()).map(|y| (x, y)).skip(1).collect());
-
 
         let mut dists = Vec::new();
         for path in paths {
@@ -149,6 +145,10 @@ fn main() -> Result<()> {
             }
         }
     }
-    println!("Best treehouse score {:?} at {:?}", best_score.unwrap(), best_loc.unwrap());
+    println!(
+        "Best treehouse score {:?} at {:?}",
+        best_score.unwrap(),
+        best_loc.unwrap()
+    );
     Ok(())
 }

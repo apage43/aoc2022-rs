@@ -27,6 +27,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc2022"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "derive_builder",
+ "regex",
+ "strp",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -113,94 +123,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "day1"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day10"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day11"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "derive_builder",
-]
-
-[[package]]
-name = "day12"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day2"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day3"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day4"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "strp",
-]
-
-[[package]]
-name = "day5"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "regex",
- "strp",
-]
-
-[[package]]
-name = "day6"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day7"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day8"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
-]
-
-[[package]]
-name = "day9"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
 ]
 
 [[package]]
