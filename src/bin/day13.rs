@@ -97,7 +97,7 @@ fn main() -> Result<()> {
     let mut all_packets: Vec<Value> = input
         .lines()
         .filter(|s| !s.is_empty())
-        .map(|s| Ok(Value::from_str(s)?))
+        .map(Value::from_str)
         .collect::<Result<_>>()?;
     let marker_a = Value::from_str("[[2]]")?;
     let marker_b = Value::from_str("[[6]]")?;

@@ -18,7 +18,7 @@ impl Display for Heightmap {
         let aschars: Vec<char> = self
             .heights
             .iter()
-            .map(|h| (*h + 'a' as u8) as char)
+            .map(|h| (*h + b'a') as char)
             .collect();
         for chunk in aschars.chunks(self.stride) {
             for ch in chunk {
@@ -36,14 +36,14 @@ fn raw_pos_to_pos(stride: usize, rawp: usize) -> (usize, usize) {
 
 impl Heightmap {
     fn from_str(input: &str) -> Result<Heightmap> {
-        let stride = input.find("\n").context("first newline")?;
+        let stride = input.find('\n').context("first newline")?;
         let mut heights = Vec::new();
         let mut idx = 0;
         let mut start = None;
         let mut end = None;
         for ch in input.chars() {
             let height = match ch {
-                ch if ch >= 'a' && ch <= 'z' => Some(ch as u8 - 'a' as u8),
+                ch if ('a'..='z').contains(&ch) => Some(ch as u8 - b'a'),
                 'S' => {
                     start = Some(raw_pos_to_pos(stride, idx));
                     Some(0)

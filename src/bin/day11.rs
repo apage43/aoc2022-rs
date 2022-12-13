@@ -97,11 +97,11 @@ fn main() -> Result<()> {
 }
 
 fn print_items(monkeys: &Vec<Monkey>) {
-    for idx in 0..monkeys.len() {
+    (0..monkeys.len()).for_each(|idx| {
         println!("Monkey {}: {:?}", idx, monkeys[idx].items);
-    }
+    });
 }
-fn do_round(monkeys: &mut Vec<Monkey>, activity: &mut Vec<u64>, part2: bool, dprod: i64) {
+fn do_round(monkeys: &mut Vec<Monkey>, activity: &mut [u64], part2: bool, dprod: i64) {
     for idx in 0..monkeys.len() {
         while let Some(worry) = monkeys[idx].items.pop_front() {
             activity[idx] += 1;

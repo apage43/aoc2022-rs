@@ -19,19 +19,18 @@ fn main() -> Result<()> {
     filesystem.insert(Vec::new(), DirectoryEntry::Directory);
     for line in std::io::stdin().lines() {
         let line = line?;
-        if line.starts_with("$") {
+        if line.starts_with('$') {
             reading_ls = false;
         }
-        if line.starts_with("$ cd ") {
-            let mut target = &line[5..];
-            if target.starts_with("/") {
+        if let Some(mut target) = line.strip_prefix("$ cd ") {
+            if target.starts_with('/') {
                 cwd.clear();
-                target = &line[6..];
+                target = &target[1..];
             }
-            if target == "" {
+            if target.is_empty() {
                 continue;
             }
-            for pel in target.split("/") {
+            for pel in target.split('/') {
                 if pel == ".." {
                     cwd.pop();
                 } else {
@@ -43,9 +42,8 @@ fn main() -> Result<()> {
             reading_ls = true;
             continue;
         }
-        if !line.starts_with("$") && reading_ls {
-            if line.starts_with("dir ") {
-                let dirname = &line[4..];
+        if !line.starts_with('$') && reading_ls {
+            if let Some(dirname) = line.strip_prefix("dir ") {
                 let mut dirpath = cwd.clone();
                 dirpath.push(dirname.to_owned());
                 filesystem.insert(dirpath, DirectoryEntry::Directory);
@@ -66,16 +64,13 @@ fn main() -> Result<()> {
     let mut dirsizes: HashMap<_, u64> = HashMap::new();
     for dir in dirs {
         let mut dsize = 0;
-        let mut entries = filesystem.range(dir.clone()..);
-        while let Some((path, dirent)) = entries.next() {
+        let entries = filesystem.range(dir.clone()..);
+        for (path, dirent) in entries {
             if !path.starts_with(&dir) {
                 break;
             }
-            match dirent {
-                DirectoryEntry::File(fsize) => {
-                    dsize += fsize;
-                }
-                _ => {}
+            if let DirectoryEntry::File(fsize) = dirent {
+                dsize += fsize;
             }
         }
         dirsizes.insert(dir, dsize);

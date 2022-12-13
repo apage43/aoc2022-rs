@@ -72,7 +72,7 @@ fn main() -> Result<()> {
     }
     let mut rope = vec![Loc::new(0, 0); num_knots];
     let mut tailpath = Vec::new();
-    tailpath.push(rope.last().unwrap().clone());
+    tailpath.push(*rope.last().unwrap());
     for (dir, dist) in moves {
         for _m in 0..dist {
             rope[0] = rope[0].moved(dir, 1);
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
                         y: rope[segment].y + (rope[segment - 1].y - rope[segment].y).signum(),
                     };
                     if segment == rope.len() - 1 {
-                        tailpath.push(newloc.clone())
+                        tailpath.push(newloc)
                     }
                     rope[segment] = newloc;
                 }

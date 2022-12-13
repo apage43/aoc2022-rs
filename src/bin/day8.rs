@@ -15,7 +15,7 @@ impl TreeGrid {
     fn height_at(&self, x: usize, y: usize) -> Option<u8> {
         self.heights.get(y * self.stride + x).copied()
     }
-    fn print_visibility(&self, vis: &Vec<Visibility>) {
+    fn print_visibility(&self, vis: &[Visibility]) {
         let digstr: Vec<char> = vis
             .iter()
             .map(|x| match x {
@@ -51,7 +51,7 @@ impl TreeGrid {
             }
             dists.push(dist);
         }
-        dists.iter().fold(1, |a, b| a * b)
+        dists.iter().product()
     }
     fn edge_visibility(&self) -> Vec<Visibility> {
         let mut visibility = vec![Visibility::Occluded; self.heights.len()];

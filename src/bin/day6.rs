@@ -9,7 +9,7 @@ fn sop_index(line: &str, n_distinct: usize) -> Option<usize> {
         // assuming these are all lowercase ascii so we can just use a u32 and popcnt
         let mut mask: u32 = 0;
         for b in marker.as_bytes() {
-            let letnum = b - ('a' as u8);
+            let letnum = b - b'a';
             assert!(letnum < 32);
             mask |= 1 << letnum;
         }

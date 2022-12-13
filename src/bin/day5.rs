@@ -38,20 +38,20 @@ fn print_stacks(mut stacks: Vec<Vec<char>>) {
         .collect::<Vec<_>>()
         .join(" ");
     lines.push(botline);
-    for i in 0..nstacks {
+    (0..nstacks).for_each(|i| {
         stacks[i].reverse()
-    }
+    });
     loop {
         let mut ncrates = 0;
         let mut segments = Vec::new();
-        for i in 0..nstacks {
+        (0..nstacks).for_each(|i| {
             if let Some(cratech) = stacks[i].pop() {
                 segments.push(format!("[{}]", cratech));
                 ncrates += 1;
             } else {
                 segments.push("   ".to_string())
             }
-        }
+        });
         if ncrates > 0 {
             lines.push(segments.join(" "));
         } else {
