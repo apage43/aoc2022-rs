@@ -1,7 +1,7 @@
 use color_eyre::{eyre::eyre, Result};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    io,
+    io, cell::RefCell,
 };
 
 #[derive(Debug, Clone)]
@@ -20,25 +20,42 @@ struct State<'a> {
     history: rpds::List<Action<'a>>,
 }
 
-fn path_toward<'a>(from: &'a str, to: &'a str, valvemap: &'a HashMap<String, Valve>) -> &'a str {
-    let mut sq = VecDeque::new();
-    sq.push_back((from, None));
-    let mut visited = HashSet::new();
-    visited.insert(from);
-    // eprintln!("Search path {} -> {}", from, to);
-    while let Some((n, step)) = sq.pop_front() {
-        if n == to {
-            return step.expect("from==to");
-        }
-        visited.insert(n);
-        for next in valvemap.get(n).unwrap().exits.iter() {
-            if visited.contains(next.as_str()) {
-                continue;
-            }
-            sq.push_back((next, step.or(Some(next))))
-        }
+struct Valvemap<'a> {
+    map: HashMap<String, Valve>,
+    pathcache: RefCell<HashMap<(&'a str, &'a str), &'a str>> 
+}
+
+impl <'a>Valvemap<'a> {
+    fn from(map: HashMap<String, Valve>) -> Valvemap<'a> {
+        Valvemap { map, pathcache: Default::default()}
     }
-    panic!("no path found");
+
+    fn path_toward(&'a self, from: &'a str, to: &'a str) -> &'a str {
+        let mut cache = self.pathcache.borrow_mut();
+        if let Some(cached) = cache.get(&(from, to)) {
+            return cached;
+        }
+        let mut sq = VecDeque::new();
+        sq.push_back((from, None));
+        let mut visited = HashSet::new();
+        visited.insert(from);
+        while let Some((n, step)) = sq.pop_front() {
+            if n == to {
+                let found: &String = step.expect("from==to");
+                cache.insert((from, to), found.as_str());
+                return found
+            }
+            visited.insert(n);
+            for next in self.map.get(n).unwrap().exits.iter() {
+                if visited.contains(next.as_str()) {
+                    continue;
+                }
+                sq.push_back((next, step.or(Some(next))))
+            }
+        }
+        panic!("no path found");
+    }
+    
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -87,11 +104,11 @@ impl<'a> State<'a> {
             .map(|v| valvemap.get(*v).expect("bad valve name").flowrate)
             .sum::<u32>()
     }
-    fn apply_action(self, valvemap: &'a HashMap<String, Valve>, action: Action<'a>) -> State<'a> {
+    fn apply_action(self, valvemap: &'a Valvemap<'a>, action: Action<'a>) -> State<'a> {
         match action {
             Action::Wait => State {
                 time_elapsed: self.time_elapsed + 1,
-                pressure_released: self.pressure_released + self.pressure_tick(valvemap),
+                pressure_released: self.pressure_released + self.pressure_tick(&valvemap.map),
                 open_valves: self.open_valves.clone(),
                 at_valve: self.at_valve,
                 seeking: None,
@@ -99,7 +116,7 @@ impl<'a> State<'a> {
             },
             Action::Open(_) => State {
                 time_elapsed: self.time_elapsed + 1,
-                pressure_released: self.pressure_released + self.pressure_tick(valvemap),
+                pressure_released: self.pressure_released + self.pressure_tick(&valvemap.map),
                 open_valves: self.open_valves.insert(self.at_valve),
                 at_valve: self.at_valve,
                 seeking: None,
@@ -107,9 +124,9 @@ impl<'a> State<'a> {
             },
             Action::MoveToward(dest) => State {
                 time_elapsed: self.time_elapsed + 1,
-                pressure_released: self.pressure_released + self.pressure_tick(valvemap),
+                pressure_released: self.pressure_released + self.pressure_tick(&valvemap.map),
                 open_valves: self.open_valves.clone(),
-                at_valve: path_toward(self.at_valve, dest, valvemap),
+                at_valve: valvemap.path_toward(self.at_valve, dest),
                 seeking: Some(dest),
                 history: self.history.push_front(action),
             },
@@ -117,7 +134,7 @@ impl<'a> State<'a> {
     }
 }
 
-fn do_part1(valvemap: &HashMap<String, Valve>) -> Result<()> {
+fn do_part1<'a>(valvemap: &'a Valvemap<'a>) -> Result<()> {
     let mut expstack = Vec::new();
     expstack.push(State {
         time_elapsed: 0,
@@ -127,17 +144,17 @@ fn do_part1(valvemap: &HashMap<String, Valve>) -> Result<()> {
         seeking: None,
         history: Default::default(),
     });
-    let mut best_rate: HashMap<u32, u32> = HashMap::new();
+    let mut best_so_far: HashMap<u32, u32> = HashMap::new();
     let mut best_pressure = 0;
     let mut best_state = None;
     while let Some(curstate) = expstack.pop() {
         {
-            let bpe = best_rate.entry(curstate.time_elapsed).or_default();
+            let bpe = best_so_far.entry(curstate.time_elapsed).or_default();
             if curstate.pressure_released > *bpe {
                 *bpe = curstate.pressure_released;
             }
             if curstate.pressure_released
-                < *best_rate
+                < *best_so_far
                     .get(&curstate.time_elapsed.saturating_sub(1))
                     .unwrap_or(&0)
             {
@@ -148,7 +165,7 @@ fn do_part1(valvemap: &HashMap<String, Valve>) -> Result<()> {
             best_pressure = curstate.pressure_released;
             best_state = Some(curstate.clone())
         }
-        let actions = curstate.actions(valvemap);
+        let actions = curstate.actions(&valvemap.map);
         for action in actions {
             expstack.push(curstate.clone().apply_action(valvemap, action));
         }
@@ -243,7 +260,7 @@ impl<'a> StateWithElephant<'a> {
     }
     fn apply_actions(
         self,
-        valvemap: &'a HashMap<String, Valve>,
+        valvemap: &'a Valvemap<'a>,
         my_action: Action<'a>,
         elephant_action: Action<'a>,
     ) -> StateWithElephant<'a> {
@@ -254,7 +271,7 @@ impl<'a> StateWithElephant<'a> {
                 open_valves = open_valves.insert(at);
                 (self.my_valve, None)
             }
-            Action::MoveToward(v) => (path_toward(self.my_valve, v, valvemap), Some(v)),
+            Action::MoveToward(v) => (valvemap.path_toward(self.my_valve, v), Some(v)),
         };
         let (elephant_valve, elephant_seeking) = match elephant_action {
             Action::Wait => (self.elephant_valve, None),
@@ -262,11 +279,11 @@ impl<'a> StateWithElephant<'a> {
                 open_valves = open_valves.insert(at);
                 (self.elephant_valve, None)
             }
-            Action::MoveToward(v) => (path_toward(self.elephant_valve, v, valvemap), Some(v)),
+            Action::MoveToward(v) => (valvemap.path_toward(self.elephant_valve, v), Some(v)),
         };
         StateWithElephant {
             time_elapsed: self.time_elapsed + 1,
-            pressure_released: self.pressure_released + self.pressure_tick(valvemap),
+            pressure_released: self.pressure_released + self.pressure_tick(&valvemap.map),
             open_valves,
             my_valve,
             elephant_valve,
@@ -277,7 +294,7 @@ impl<'a> StateWithElephant<'a> {
     }
 }
 
-fn do_part2(valvemap: &HashMap<String, Valve>) -> Result<()> {
+fn do_part2<'a>(valvemap: &'a Valvemap<'a>) -> Result<()> {
     let mut expstack = Vec::new();
     expstack.push(StateWithElephant {
         time_elapsed: 0,
@@ -289,17 +306,17 @@ fn do_part2(valvemap: &HashMap<String, Valve>) -> Result<()> {
         elephant_seeking: None,
         history: Default::default(),
     });
-    let mut best_rate: HashMap<u32, u32> = HashMap::new();
+    let mut best_so_far: HashMap<u32, u32> = HashMap::new();
     let mut best_pressure = 0;
     let mut best_state = None;
     while let Some(curstate) = expstack.pop() {
         {
-            let bpe = best_rate.entry(curstate.time_elapsed).or_default();
+            let bpe = best_so_far.entry(curstate.time_elapsed).or_default();
             if curstate.pressure_released > *bpe {
                 *bpe = curstate.pressure_released;
             }
             if curstate.pressure_released
-                < *best_rate
+                < *best_so_far
                     .get(&curstate.time_elapsed.saturating_sub(1))
                     .unwrap_or(&0)
             {
@@ -310,7 +327,7 @@ fn do_part2(valvemap: &HashMap<String, Valve>) -> Result<()> {
             best_pressure = curstate.pressure_released;
             best_state = Some(curstate.clone())
         }
-        let actions = curstate.actions(valvemap);
+        let actions = curstate.actions(&valvemap.map);
         for (ma, ea) in actions {
             expstack.push(curstate.clone().apply_actions(valvemap, ma, ea));
         }
@@ -342,7 +359,7 @@ fn main() -> Result<()> {
         println!("{src} {flowrate} -> {exits:?}");
         valvemap.insert(src, Valve { flowrate, exits });
     }
-
+    let valvemap = Valvemap::from(valvemap);
     do_part1(&valvemap)?;
     do_part2(&valvemap)?;
     Ok(())
