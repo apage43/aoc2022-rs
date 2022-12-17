@@ -1,6 +1,7 @@
 use color_eyre::Result;
 use core::panic;
 use std::{
+    collections::HashSet,
     fmt::{Display, Write},
     io,
     ops::{Add, Neg, Sub},
@@ -112,7 +113,7 @@ impl Chamber {
                             || (rock.blocked(iloc) && self.blocked(nloc + iloc))
                         {
                             self.falling_rock = Some((rock, loc));
-                            return
+                            return;
                         }
                     }
                 }
@@ -154,8 +155,8 @@ impl Chamber {
         let my = (self.occupancy.len() as isize / CHAMBER_WIDTH).neg();
         for y in my..0 {
             for x in 0..CHAMBER_WIDTH {
-                if self.blocked(Loc(x,y)) {
-                    return y.neg()
+                if self.blocked(Loc(x, y)) {
+                    return y.neg();
                 }
             }
         }
@@ -180,6 +181,19 @@ impl Chamber {
         } else {
             panic!("oob");
         }
+    }
+    fn floordepth(&self) -> [usize; CHAMBER_WIDTH as usize] {
+        let mut out = [0; CHAMBER_WIDTH as usize];
+        let sh = self.stack_height().neg();
+        for x in 0..CHAMBER_WIDTH {
+            for y in sh..=0 {
+                if self.blocked(Loc(x, y)) || y == 0 {
+                    out[x as usize] = (y - sh) as usize;
+                    break;
+                }
+            }
+        }
+        out
     }
 }
 
@@ -258,6 +272,13 @@ fn main() -> Result<()> {
     let mut pidx = 0;
     let mut stopped: usize = 0;
     println!("{chamber}");
+    let mut lsh = chamber.stack_height();
+    let mut steps = HashSet::new();
+    let mut ccount = false;
+    let mut cinc: usize = 0;
+    let mut clen = 0;
+    let mut cycle = None;
+    let mut bh = 0;
     loop {
         chamber.push_rock(pseq[pidx]);
         pidx = (pidx + 1) % pseq.len();
@@ -266,10 +287,41 @@ fn main() -> Result<()> {
         //println!("{chamber}");
         if chamber.falling_rock.is_none() {
             stopped += 1;
-            if stopped == 2022 {
-                let sh = chamber.stack_height();
-                println!("{chamber}\n{stopped} rocks stopped, stack height {sh}");
-                break
+            let sh = chamber.stack_height();
+            let linc = sh - lsh;
+            lsh = sh;
+            if ccount {
+                cinc += linc as usize;
+                clen += 1;
+            }
+            let fd = chamber.floordepth();
+            if cycle.is_none() {
+                let ck = (fd, pidx, ridx);
+                if !steps.insert(ck) {
+                    println!("Found cycle beginning with {ck:?}");
+                    if ccount {
+                        println!("Cycle height/len: {cinc} {clen}");
+                        cycle = Some((cinc, clen));
+                        let sl = 1000000000000 - stopped ;
+                        let ccount = sl / clen;
+                        stopped  += ccount * clen;
+                        bh = ccount * cinc;
+                        println!("bump height: {}", bh);
+                    } else {
+                        steps.clear();
+                        steps.insert(ck);
+                        ccount = true;
+                    }
+                };
+            }
+            if stopped == 2022 || stopped == 1000000000000 {
+                println!(
+                    "{stopped} rocks stopped, stack height {sh}, last increase {linc}"
+                );
+                println!("bump height {} total height {}", bh, sh as usize + bh);
+                if stopped == 1000000000000 {
+                    break;
+                }
             }
             ridx = (ridx + 1) % rocks.len();
             chamber.spawn_rock(rocks[ridx].clone());
