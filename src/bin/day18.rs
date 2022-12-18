@@ -1,5 +1,9 @@
 use color_eyre::Result;
-use std::{collections::HashSet, io, ops::Add};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    ops::Add,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct Loc3(isize, isize, isize);
@@ -50,6 +54,50 @@ fn main() -> Result<()> {
         }
     }
     println!("P1 unconnected sides: {unconnected_sides}");
+
+    let mins = cubelocs
+        .iter()
+        .copied()
+        .reduce(|a, b| Loc3(a.0.min(b.0), a.1.min(b.1), a.2.min(b.2)))
+        .unwrap();
+    let maxs = cubelocs
+        .iter()
+        .copied()
+        .reduce(|a, b| Loc3(a.0.max(b.0), a.1.max(b.1), a.2.max(b.2)))
+        .unwrap();
+
+    let oob = |loc: Loc3| {
+        loc.0 < mins.0
+            || loc.1 < mins.1
+            || loc.2 < mins.2
+            || loc.0 > maxs.0
+            || loc.1 > maxs.1
+            || loc.2 > maxs.2
+    };
+
+    let mut exterior_surface = 0;
+    let mut cache: HashMap<Loc3, bool> = HashMap::new();
+    for cube in cubeset.iter() {
+        for adj in cube.adjacents() {
+            if !cubeset.contains(&adj) {
+                let outside_reachable = if cache.contains_key(&adj) {
+                    *cache.get(&adj).unwrap()
+                } else {
+                    let oob_reached = pathfinding::prelude::bfs(
+                        &adj,
+                        |l| l.adjacents().filter(|a| !cubeset.contains(a)),
+                        |l| oob(*l),
+                    ).is_some();
+                    cache.insert(adj, oob_reached);
+                    oob_reached
+                };
+                if outside_reachable {
+                    exterior_surface += 1;
+                }
+            }
+        }
+    }
+    println!("P2 exterior surface sides: {}", exterior_surface);
 
     Ok(())
 }
