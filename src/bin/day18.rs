@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map, HashMap, HashSet},
     io,
-    ops::Add,
+    ops::Add, hash::Hash,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -76,28 +76,39 @@ fn main() -> Result<()> {
     };
 
     let mut exterior_surface = 0;
-    let mut cache: HashMap<Loc3, bool> = HashMap::new();
+    let mut oob_reachable = cached(|loc: Loc3| {
+        pathfinding::prelude::bfs(
+            &loc,
+            |l| l.adjacents().filter(|a| !cubeset.contains(a)),
+            |l| oob(*l),
+        )
+        .is_some()
+    });
     for cube in cubeset.iter() {
         for adj in cube.adjacents() {
-            if !cubeset.contains(&adj) {
-                let outside_reachable = if cache.contains_key(&adj) {
-                    *cache.get(&adj).unwrap()
-                } else {
-                    let oob_reached = pathfinding::prelude::bfs(
-                        &adj,
-                        |l| l.adjacents().filter(|a| !cubeset.contains(a)),
-                        |l| oob(*l),
-                    ).is_some();
-                    cache.insert(adj, oob_reached);
-                    oob_reached
-                };
-                if outside_reachable {
-                    exterior_surface += 1;
-                }
+            if !cubeset.contains(&adj) && oob_reachable(adj) {
+                exterior_surface += 1;
             }
         }
     }
     println!("P2 exterior surface sides: {}", exterior_surface);
 
     Ok(())
+}
+
+fn cached<I, O>(f: impl Fn(I) -> O) -> impl FnMut(I) -> O
+where
+    I: Hash + Eq + Copy,
+    O: Copy,
+{
+    let mut cache: HashMap<I, O> = Default::default();
+    use hash_map::Entry::*;
+    move |k: I| match cache.entry(k) {
+        Vacant(e) => {
+            let computed = f(k);
+            e.insert(computed);
+            computed
+        }
+        Occupied(v) => *v.get(),
+    }
 }
