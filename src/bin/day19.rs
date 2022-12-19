@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use rayon::prelude::*;
 use regex::Regex;
-use std::{collections::HashSet, hash::Hash, io};
+use std::{collections::HashSet, hash::Hash, io, time::Instant};
 
 #[derive(Debug, Clone, Copy)]
 struct Blueprint {
@@ -145,6 +145,7 @@ fn main() -> Result<()> {
         });
     }
     println!("Checking {} blueprints...", blueprints.len());
+    let p1start = Instant::now();
     let total_qlv: usize = blueprints
         .clone()
         .into_par_iter()
@@ -155,8 +156,10 @@ fn main() -> Result<()> {
             qlv as usize
         })
         .sum();
-    println!("Total qlv: {total_qlv}\n");
+    let p1time = p1start.elapsed();
+    println!("{p1time:?} Total qlv: {total_qlv}\n");
 
+    let p2start = Instant::now();
     let p2ans: usize = blueprints
         .into_par_iter()
         .take(3)
@@ -166,7 +169,8 @@ fn main() -> Result<()> {
             geodes as usize
         })
         .product();
-    println!("Top3 product: {p2ans}");
+    let p2time = p2start.elapsed();
+    println!("{p2time:?} Top3 product: {p2ans}");
     Ok(())
 }
 
