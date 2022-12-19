@@ -176,17 +176,24 @@ fn main() -> Result<()> {
 
 fn score_blueprint(bp: Blueprint, time_limit: u8) -> u16 {
     let mut states = vec![State::new()];
-    let mut best_state: Option<State> = None;
+    let mut best_final: Option<State> = None;
     let mut seen = HashSet::new();
+    let mut best_at_time = vec![0; time_limit as usize];
     while let Some(state) = states.pop() {
         if seen.contains(&state) {
             continue;
         } else {
             seen.insert(state);
         }
-        let geode_best = best_state.map(|s| s.geode_held).unwrap_or(0);
         let time_left = time_limit - state.time_elapsed;
-
+        if time_left > 0 {
+            if best_at_time[state.time_elapsed as usize] > state.geode_held {
+                continue;
+            } else {
+                best_at_time[state.time_elapsed as usize] = state.geode_held
+            }
+        }
+        let geode_best = best_final.map(|s| s.geode_held).unwrap_or(0);
         // could we beat the current best if geode bots were free?
         let geode_naive_upper_bound = state.geode_held
             + (0..time_left)
@@ -200,13 +207,13 @@ fn score_blueprint(bp: Blueprint, time_limit: u8) -> u16 {
             for nact in state.actions_possible(&bp) {
                 states.push(state.do_action(nact, &bp));
             }
-        } else if let Some(best) = best_state {
+        } else if let Some(best) = best_final {
             if state.geode_held > best.geode_held {
-                best_state = Some(state)
+                best_final = Some(state)
             }
         } else {
-            best_state = Some(state)
+            best_final = Some(state)
         }
     }
-    best_state.map(|s| s.geode_held).unwrap_or(0)
+    best_final.map(|s| s.geode_held).unwrap_or(0)
 }
