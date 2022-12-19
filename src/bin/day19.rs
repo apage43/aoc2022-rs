@@ -64,16 +64,18 @@ impl State {
     fn actions_possible(&self, blueprint: &Blueprint) -> impl Iterator<Item = Action> {
         use Action::*;
         use Material::*;
+        let geode_affordable = self.ore_held >= blueprint.geode_ore_cost
+            && self.obsidian_held >= blueprint.geode_obsidian_cost;
+        let obsidian_affordable = self.ore_held >= blueprint.obsidian_ore_cost
+            && self.clay_held >= blueprint.obsidian_clay_cost;
+        let clay_affordable = self.ore_held >= blueprint.clay_ore_cost;
+        let ore_affordable = self.ore_held >= blueprint.ore_ore_cost;
         [
-            (self.ore_held >= blueprint.geode_ore_cost
-                && self.obsidian_held >= blueprint.geode_obsidian_cost)
-                .then_some(BuildRobot(Geode)),
-            (self.ore_held >= blueprint.obsidian_ore_cost
-                && self.clay_held >= blueprint.obsidian_clay_cost)
-                .then_some(BuildRobot(Obsidian)),
-            (self.ore_held >= blueprint.clay_ore_cost).then_some(BuildRobot(Clay)),
-            (self.ore_held >= blueprint.ore_ore_cost).then_some(BuildRobot(Ore)),
-            Some(Wait),
+            (!geode_affordable).then_some(Wait),
+            (ore_affordable && !geode_affordable).then_some(BuildRobot(Ore)),
+            (clay_affordable && !geode_affordable).then_some(BuildRobot(Clay)),
+            (obsidian_affordable && !geode_affordable).then_some(BuildRobot(Obsidian)),
+            (geode_affordable).then_some(BuildRobot(Geode)),
         ]
         .into_iter()
         .flatten()
