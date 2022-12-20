@@ -14,6 +14,20 @@ struct Blueprint {
     geode_obsidian_cost: u16,
 }
 
+impl Blueprint {
+    fn max_ore(&self) -> u16 {
+        [
+            self.ore_ore_cost,
+            self.clay_ore_cost,
+            self.obsidian_ore_cost,
+            self.geode_ore_cost,
+        ]
+        .into_iter()
+        .max()
+        .unwrap()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Material {
     Ore,
@@ -72,9 +86,14 @@ impl State {
         let ore_affordable = self.ore_held >= blueprint.ore_ore_cost;
         [
             (!geode_affordable).then_some(Wait),
-            (ore_affordable && !geode_affordable).then_some(BuildRobot(Ore)),
-            (clay_affordable && !geode_affordable).then_some(BuildRobot(Clay)),
-            (obsidian_affordable && !geode_affordable).then_some(BuildRobot(Obsidian)),
+            (self.ore_bots < blueprint.max_ore() && ore_affordable && !geode_affordable)
+                .then_some(BuildRobot(Ore)),
+            (self.clay_bots < blueprint.obsidian_clay_cost && clay_affordable && !geode_affordable)
+                .then_some(BuildRobot(Clay)),
+            (self.obsidian_bots < blueprint.geode_obsidian_cost
+                && obsidian_affordable
+                && !geode_affordable)
+                .then_some(BuildRobot(Obsidian)),
             (geode_affordable).then_some(BuildRobot(Geode)),
         ]
         .into_iter()
@@ -193,16 +212,6 @@ fn score_blueprint(bp: Blueprint, time_limit: u8) -> u16 {
                 best_at_time[state.time_elapsed as usize] = state.geode_held
             }
         }
-        let geode_best = best_final.map(|s| s.geode_held).unwrap_or(0);
-        // could we beat the current best if geode bots were free?
-        let geode_naive_upper_bound = state.geode_held
-            + (0..time_left)
-                .map(|n| state.geode_bots + n as u16)
-                .sum::<u16>();
-        if geode_naive_upper_bound < geode_best {
-            continue;
-        }
-
         if state.time_elapsed < time_limit {
             for nact in state.actions_possible(&bp) {
                 states.push(state.do_action(nact, &bp));
