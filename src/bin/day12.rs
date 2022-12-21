@@ -31,7 +31,7 @@ impl Display for Heightmap {
 }
 
 fn raw_pos_to_pos(stride: usize, rawp: usize) -> (usize, usize) {
-    (rawp as usize % stride, rawp as usize / stride)
+    (rawp % stride, rawp / stride)
 }
 
 impl Heightmap {

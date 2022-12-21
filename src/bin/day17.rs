@@ -25,7 +25,7 @@ impl Rock {
         assert!(!loc.0.is_negative());
         assert!(!loc.1.is_negative());
         let rawloc = loc.1 as usize * self.w + loc.0 as usize;
-        let rawloc = rawloc as usize;
+        let rawloc = rawloc;
         if self.occupancy.len() > rawloc {
             self.occupancy[rawloc]
         } else {
