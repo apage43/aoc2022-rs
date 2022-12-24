@@ -90,7 +90,6 @@ fn bloccupancy(blizzards: &[(Pos, Dir)]) -> HashSet<Pos> {
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 struct State {
     time_elapsed: u32,
-    blizzard_occupancy_idx: usize,
     pos: Pos,
     need_snack: bool,
     has_snack: bool,
@@ -104,13 +103,8 @@ impl State {
     ) -> impl Iterator<Item = State> {
         use Dir::*;
         let blen = bloccupancies.len();
-        let curblocced = &bloccupancies[self.blizzard_occupancy_idx];
-        let nidx = (self.blizzard_occupancy_idx + 1) % blen;
+        let nidx = (self.time_elapsed as usize + 1) % blen;
         let nextblocced = &bloccupancies[nidx];
-        let alive = !curblocced.contains(&self.pos);
-        if !alive {
-            println!("Dead branch");
-        }
         let can_go = |dir: Dir| {
             let next = match self.pos.go(dir) {
                 Some(pos) => pos,
@@ -119,21 +113,20 @@ impl State {
             !nextblocced.contains(&next) && !walls.contains(&next)
         };
         let mut c = [
-            (alive && can_go(Right)).then(|| self.advance(Some(Right), blen)),
-            (alive && can_go(Down)).then(|| self.advance(Some(Down), blen)),
-            (alive && can_go(Up)).then(|| self.advance(Some(Up), blen)),
-            (alive && can_go(Left)).then(|| self.advance(Some(Left), blen)),
-            (alive && !nextblocced.contains(&self.pos)).then(|| self.advance(None, blen)),
+            (can_go(Right)).then(|| self.advance(Some(Right))),
+            (can_go(Down)).then(|| self.advance(Some(Down))),
+            (can_go(Up)).then(|| self.advance(Some(Up))),
+            (can_go(Left)).then(|| self.advance(Some(Left))),
+            (!nextblocced.contains(&self.pos)).then(|| self.advance(None)),
         ];
         if self.need_snack && !self.has_snack {
             c[0..4].reverse()
         }
         c.into_iter().flatten()
     }
-    fn advance(&self, dir: Option<Dir>, blen: usize) -> State {
+    fn advance(&self, dir: Option<Dir>) -> State {
         State {
             time_elapsed: self.time_elapsed + 1,
-            blizzard_occupancy_idx: (self.blizzard_occupancy_idx + 1) % blen,
             pos: match dir {
                 Some(dir) => self.pos.go(dir).unwrap(),
                 None => self.pos,
@@ -187,7 +180,6 @@ fn main() -> Result<()> {
     let mut q = VecDeque::new();
     q.push_back(State {
         time_elapsed: 0,
-        blizzard_occupancy_idx: 0,
         pos: start,
         need_snack: false,
         has_snack: false,
