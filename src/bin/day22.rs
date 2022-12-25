@@ -1,10 +1,18 @@
 use color_eyre::Result;
 use num::integer::Roots;
 use regex::Regex;
-use std::{collections::HashSet, hash::Hash, io};
+use std::{collections::HashSet, hash::Hash, io, ops::Add};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct Loc(usize, usize);
+
+impl Add for Loc {
+    type Output = Loc;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Loc(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
 
 #[derive(Default, Clone)]
 struct Board {
@@ -36,6 +44,116 @@ impl Board {
         }
         assert!(cidx == 6);
         facecorners
+    }
+}
+
+struct CubicBoard {
+    board: Board,
+    sqside: usize,
+    corners: [Loc; 6],
+}
+
+impl CubicBoard {
+    fn facenum(&self, loc: Loc) -> Option<usize> {
+        for (idx, corner) in self.corners.iter().enumerate() {
+            let endc = *corner + Loc(self.sqside, self.sqside);
+            if loc.0 >= corner.0 && loc.0 < endc.0 && loc.1 >= corner.1 && loc.1 < endc.1 {
+                return Some(idx);
+            }
+        }
+        println!("No face: {:?}", loc);
+        None
+    }
+    fn edgemap(&self, srcface: usize, fromdir: Dir) -> Option<(usize, Dir, bool)> {
+
+        use Dir::*;
+        if self.sqside == 4 {
+            // example input
+            Some(match (srcface, fromdir) {
+                (0, Up) => (1, Down, true),
+                (0, Right) => (5, Left, true),
+                (0, Left) => (2, Down, false),
+                (1, Up) => (0, Up, true),
+                (1, Left) => (5, Up, true),
+                (1, Down) => (4, Up, true),
+                (2, Up) => (0, Right, false),
+                (2, Down) => (4, Right, true),
+                (3, Right) => (5, Down, true),
+                (4, Left) => (2, Up, true),
+                (4, Down) => (1, Up, true),
+                (5, Down) => (1, Right, true),
+                (5, Right) => (0, Left, true),
+                _ => None?,
+            })
+        } else {
+            // hardcoded for my input
+            //  01
+            //  2
+            // 34
+            // 5
+            Some(match (srcface, fromdir) {
+                // new face, new dir, flipped?
+                (0, Up) => (5, Right, false),
+                (0, Left) => (3, Right, true),
+                (1, Up) => (5, Up, false),
+                (1, Right) => (4, Left, true),
+                (1, Down) => (2, Left, false),
+                (2, Left) => (3, Down, false),
+                (2, Right) => (1, Up, false),
+                (3, Left) => (0, Right, true),
+                (3, Up) => (2, Right, false),
+                (4, Right) => (1, Left, true),
+                (4, Down) => (5, Left, false),
+                (5, Left) => (0, Down, false),
+                (5, Right) => (4, Up, false),
+                (5, Down) => (1, Down, false),
+                _ => None?,
+            })
+        }
+    }
+    fn try_advance(&self, from: Loc, dir: Dir) -> Option<(Loc, Dir)> {
+        if let Some(nowrap) = (|| {
+            Some(match dir {
+                Dir::Right if from.0 < self.board.width => Loc(from.0 + 1, from.1),
+                Dir::Down if from.1 < self.board.height => Loc(from.0, from.1 + 1),
+                Dir::Left => Loc(from.0.checked_sub(1)?, from.1),
+                Dir::Up => Loc(from.0, from.1.checked_sub(1)?),
+                _ => None?,
+            })
+        })() {
+            if self.board.open_tiles.contains(&nowrap) {
+                return Some((nowrap, dir));
+            }
+            if self.board.walls.contains(&nowrap) {
+                return None;
+            }
+        }
+        // walked off an edge
+        let edgepos = match dir {
+            Dir::Up | Dir::Down => from.0 % self.sqside,
+            Dir::Right | Dir::Left => from.1 % self.sqside,
+        };
+        let (to, ndir, flip) = self
+            .edgemap(self.facenum(from).unwrap(), dir)
+            .expect("edge map");
+        let edgepos = if flip {
+            (self.sqside - 1) - edgepos
+        } else {
+            edgepos
+        };
+        let inner = match ndir {
+            Dir::Right => Loc(0, edgepos),
+            Dir::Down => Loc(edgepos, 0),
+            Dir::Left => Loc(self.sqside - 1, edgepos),
+            Dir::Up => Loc(edgepos, self.sqside - 1),
+        };
+        //println!( "moving from face {:?} -> {:?}, {:?} -> {:?}, {:?} -> {:?}", self.facenum(from), to, dir, ndir, from, inner );
+        let nloc = self.corners[to] + inner;
+        if self.board.walls.contains(&nloc) {
+            None
+        } else {
+            Some((nloc, ndir))
+        }
     }
 }
 
@@ -172,14 +290,14 @@ fn main() -> Result<()> {
             };
         }
     }
-
+    let start_loc = board
+        .open_tiles
+        .iter()
+        .min_by_key(|l| (l.1, l.0))
+        .copied()
+        .expect("topleft open tile");
     let mut player = Player {
-        location: board
-            .open_tiles
-            .iter()
-            .min_by_key(|l| (l.1, l.0))
-            .copied()
-            .expect("topleft open tile"),
+        location: start_loc,
         facing: Dir::Right,
     };
 
@@ -217,5 +335,45 @@ fn main() -> Result<()> {
     let edgelen = board.square_edge();
     let faces = board.face_corners();
     println!("part2, folding. edgelen: {edgelen}, faces at: {faces:?}");
+
+    let cubic = CubicBoard {
+        sqside: edgelen,
+        corners: faces,
+        board,
+    };
+    println!("starting face: {:?}", cubic.facenum(start_loc));
+    let mut player = Player {
+        location: start_loc,
+        facing: Dir::Right,
+    };
+
+    println!("start: {player:?}");
+    for cmd in &cmds {
+        //println!("{cmd:?}");
+        match cmd {
+            Cmd::Forward(dist) => {
+                for _ in 0..*dist {
+                    if let Some(adv) = cubic.try_advance(player.location, player.facing) {
+                        (player.location, player.facing) = adv;
+                        // print!(" -> {adv:?}");
+                    } else {
+                        //println!(" blocked");
+                        break;
+                    }
+                }
+            }
+            Cmd::TurnRight => {
+                player.facing = player.facing.turn_right();
+                //println!(" facing: {:?}", player.facing);
+            }
+            Cmd::TurnLeft => {
+                player.facing = player.facing.turn_left();
+                //println!(" facing: {:?}", player.facing);
+            }
+        }
+    }
+    let passwd =
+        1000 * (player.location.1 + 1) + 4 * (player.location.0 + 1) + player.facing as usize;
+    println!("passwd: {passwd}");
     Ok(())
 }
